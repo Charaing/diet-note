@@ -254,7 +254,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="foods.js?v=3a42728ab2" charset="utf-8"></script>
+<script src="foods.js?v=1f9fead71f" charset="utf-8"></script>
 <script>
 (function(){
 "use strict";
@@ -335,7 +335,7 @@ const Store={
 /* ---------- state ---------- */
 const today=()=>keyOf(new Date());
 const S={tab:"log", date:today(), statRange:7, plan:"16:8", sheet:null, cart:[], ready:false};
-const defaultProfile=()=>({set:false,sex:"f",age:30,height:163,weight:60,target:55,act:1.375,aim:"lose",split:"balance",kcal:1600,water:8,recent:[],custom:[],fasts:[],active:null,lunch:{on:true,k:900,from:null}});
+const defaultProfile=()=>({set:false,sex:"f",age:30,height:163,weight:60,target:55,act:1.375,aim:"lose",split:"balance",kcal:1600,water:8,recent:[],custom:[],fasts:[],active:null,lunch:{on:true,k:850,from:null}});
 const defaultDay=()=>({m:{b:[],l:[],d:[],s:[]},skip:{},water:0,weight:null,ex:[]});
 let P=defaultProfile();
 const dayKey=k=>"d-"+k;
@@ -343,10 +343,12 @@ const weekKeys=k=>{const w=(fromKey(k).getDay()+6)%7;return Array.from({length:7
 const nowHM=()=>{const d=new Date();return `${pad(d.getHours())}:${pad(d.getMinutes())}`};
 const isWeekday=k=>{const w=fromKey(k).getDay();return w>0&&w<6};
 // 평일 점심 급식: 시작일부터 오늘까지의 평일에 한 번만 넣고, 지우면 다시 넣지 않아요
-// 급식 탄단지는 목표 탭에서 고른 비율을 따라가요 (저탄고지면 밥을 빼고 먹는 기준)
-function lunchMacros(){const k=P.lunch.k||900,[c,p,f]=SPLITS[P.split]||SPLITS.balance,cb=+(k*c/400).toFixed(1);return {k,cb,p:+(k*p/400).toFixed(1),f:+(k*f/900).toFixed(1),s:+(cb*.1).toFixed(1)}}
-function lunchEntry(){return {id:uid(),n:"학교 급식",u:"1식",amt:"1식",g:0,...lunchMacros(),na:1600,t:"12:30",auto:true}}
+// 급식 영양은 2026년 10월 급식 20일 분석 평균으로 고정 (탄수화물 100g)
+const LUNCH={k:850,cb:100,p:33,f:35,s:23,na:1900};
+function lunchEntry(){return {id:uid(),n:"학교 급식",u:"1식",amt:"1식",g:0,...LUNCH,t:"12:30",auto:true}}
 function withLunch(k,d){
+  const old=(d.m.l||[]).some(e=>e.auto&&(e.k!==LUNCH.k||e.cb!==LUNCH.cb||e.p!==LUNCH.p||e.f!==LUNCH.f));
+  if(old){d=JSON.parse(JSON.stringify(d)); d.m.l=d.m.l.map(e=>e.auto?{...e,...LUNCH}:e); saveDay(k,d)}
   const L=P.lunch; if(!L||!L.on||!L.from||k<L.from||k>today()||!isWeekday(k)||d.autoL) return d;
   d=JSON.parse(JSON.stringify(d)); d.autoL=true;
   if(!(d.m.l||[]).length){d.m.l=[lunchEntry()]; d.skip.l=false}
@@ -584,7 +586,7 @@ function viewGoal(){
       <div class="legend" id="gramsLine"><span><i style="background:var(--carb)"></i>탄수화물 ${g.c}g</span><span><i style="background:var(--protein)"></i>단백질 ${g.p}g</span><span><i style="background:var(--fat)"></i>지방 ${g.f}g</span></div></div>
     <label>하루 물 목표 (250ml 잔)<input id="gWater" type="number" inputmode="numeric" min="1" max="16" value="${P.water}"></label>
     <label class="check"><input id="gLunchOn" type="checkbox" ${P.lunch.on?"checked":""}>평일 점심에 학교 급식 자동 기록</label>
-    <label>급식 칼로리 (kcal)<input id="gLunchK" type="number" inputmode="numeric" step="10" min="100" max="3000" value="${P.lunch.k}"></label>
+    <p class="note" style="margin:-4px 0 0">급식 1식: 850kcal, 탄수화물 100g, 단백질 33g, 지방 35g, 당류 23g, 나트륨 1,900mg</p>
     <button class="btn block" type="submit">목표 저장</button>
   </form>
   ${window.claude?"":`<section class="sec"><div class="sec-h"><h2>데이터</h2><span class="aside">${Store.cloud?"계정에 저장 중":"이 기기에만 저장돼요"}</span></div>
@@ -812,12 +814,9 @@ document.addEventListener("submit",async e=>{
   if(e.target.id==="goalForm"){
     const np=readGoalForm(); const k=parseFloat($("#gK").value);
     np.kcal=k>=800&&k<=6000?Math.round(k):calcKcal(np); np.water=Math.max(1,Math.min(16,parseInt($("#gWater").value)||8)); np.set=true;
-    const on=$("#gLunchOn").checked, lk=parseInt($("#gLunchK").value);
-    np.lunch={on,k:lk>=100&&lk<=3000?lk:900,from:on?(P.lunch.on&&P.lunch.from?P.lunch.from:today()):null};
+    const on=$("#gLunchOn").checked;
+    np.lunch={on,k:LUNCH.k,from:on?(P.lunch.on&&P.lunch.from?P.lunch.from:today()):null};
     P=np; saveP();
-    const tk=today(); await loadDay(tk);
-    const td=Store.cache[dayKey(tk)];
-    if(td&&(td.m.l||[]).some(e=>e.auto)){const nd=JSON.parse(JSON.stringify(td));nd.m.l=nd.m.l.map(e=>e.auto?{...e,...lunchMacros()}:e);saveDay(tk,nd)}
     await loadDay(S.date); render(); toast("목표를 저장했어요");
   }
   if(e.target.id==="customForm") A.saveCustom();

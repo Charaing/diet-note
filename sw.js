@@ -1,5 +1,5 @@
-const C="dietnote-3a42728ab2";
-const SHELL=["./","index.html","foods.js?v=3a42728ab2","manifest.webmanifest","icon.svg","icon-192.png"];
+const C="dietnote-1f9fead71f";
+const SHELL=["./","index.html","foods.js?v=1f9fead71f","manifest.webmanifest","icon.svg","icon-192.png"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener("fetch",e=>{
