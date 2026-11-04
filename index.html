@@ -76,6 +76,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .copyline{padding:0 16px 14px;font-size:13px}
 .copyline button{color:var(--accent);font-weight:600}
 .tag{font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:1px}
+.wsum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 4px 12px;font-size:12px;color:var(--muted)}
+.wsum b{display:block;font-family:var(--f-display);font-weight:800;font-size:20px;color:var(--ink)}
+.spark{display:block;width:100%;height:34px;margin-top:8px;overflow:visible}
 .backup{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .chip-today{font-family:var(--f-body);font-size:12px;font-weight:600;background:var(--ink);color:var(--bg);border-radius:99px;padding:2px 9px}
 .iconbtn{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;color:var(--ink);background:var(--surface);border:1px solid var(--line)}
@@ -254,7 +257,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="foods.js?v=1f9fead71f" charset="utf-8"></script>
+<script src="foods.js?v=c318b2011b" charset="utf-8"></script>
 <script>
 (function(){
 "use strict";
@@ -460,6 +463,9 @@ function viewLog(){
         <div class="wrow"><button class="btn ghost" data-act="waterStep" data-v="-1" aria-label="한 잔 빼기">−</button><button class="btn" style="flex:1" data-act="waterStep" data-v="1">한 잔 마셨어요</button></div>
       </div>
       <div class="card"><h3>체중</h3><div class="v num">${d.weight?f1(d.weight):"--.-"}<small> kg</small></div>
+        ${(()=>{const h=Array.from({length:30},(_,i)=>addDays(S.date,i-29)).map((k,i)=>{const x=Store.cache[dayKey(k)];return x&&x.weight?[i,x.weight]:null}).filter(Boolean);
+          if(h.length<2)return "";const lo=Math.min(...h.map(p=>p[1])),hi=Math.max(...h.map(p=>p[1])),r=hi-lo||1,pts=h.map(([i,w])=>`${i/29*100},${30-(w-lo)/r*26-2}`);
+          return `<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" role="img" aria-label="최근 30일 체중"><polyline fill="none" stroke="var(--protein)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" points="${pts.join(" ")}"/></svg>`})()}
         <div class="delta">${d.weight&&wPrev?`지난 기록보다 ${d.weight-wPrev>0?"+":""}${f1(d.weight-wPrev)}kg`:`목표 ${f1(P.target)}kg`}</div>
         <div class="wrow"><input id="wIn" type="number" inputmode="decimal" step="0.1" min="20" max="300" placeholder="${f1(latestWeight())}" value="${d.weight||""}" aria-label="체중 kg"><button class="btn" data-act="saveW">기록</button></div>
       </div>
@@ -510,7 +516,7 @@ function tick(){
 /* ---------- 통계 ---------- */
 function viewStats(){
   return `<div class="top"><h1>통계</h1>${syncHTML()}</div>
-  <div class="seg" style="margin:0 0 14px">${[[7,"최근 7일"],[30,"최근 30일"]].map(([v,n])=>`<button data-act="range" data-v="${v}" aria-pressed="${S.statRange===v}">${n}</button>`).join("")}</div>
+  <div class="seg" style="margin:0 0 14px;grid-template-columns:repeat(3,1fr)">${[[7,"7일"],[30,"30일"],[90,"90일"]].map(([v,n])=>`<button data-act="range" data-v="${v}" aria-pressed="${S.statRange===v}">${n}</button>`).join("")}</div>
   <div id="statsBody"><div class="empty">불러오는 중</div></div>`;
 }
 async function fillStats(){
@@ -536,20 +542,22 @@ async function fillStats(){
   ticks.forEach(v=>{svg+=`<line x1="${L}" x2="${W-6}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text class="ax" x="${L-6}" y="${y(v)+3}" text-anchor="end">${fmt(v)}</text>`});
   rows.forEach((r,i)=>{const h=r.t.k/max*ih, x=L+i*bw+bw*.18, w=bw*.64;
     if(r.t.k>0) svg+=`<rect x="${x}" y="${y(r.t.k)}" width="${w}" height="${h}" rx="${Math.min(4,w/2)}" fill="${r.t.k>g.kcal+r.t.burn?"var(--over)":"var(--accent)"}"><title>${label(r.k)} ${fmt(r.t.k)}kcal</title></rect>`;
-    const show=n<=7||i%5===n%5-1||i===n-1;
+    const show=n<=7||(n-1-i)%(n<=30?5:15)===0;
     if(show){const d=fromKey(r.k);svg+=`<text class="ax" x="${L+i*bw+bw/2}" y="${H-6}" text-anchor="middle">${n<=7?WD[d.getDay()]:(d.getMonth()+1)+"/"+d.getDate()}</text>`}
   });
   svg+=`<line x1="${L}" x2="${W-6}" y1="${y(g.kcal)}" y2="${y(g.kcal)}" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="4 3"/><text class="ax" x="${W-8}" y="${y(g.kcal)-4}" text-anchor="end" style="fill:var(--ink)">목표 ${fmt(g.kcal)}</text></svg>`;
   // weight chart
   let wsvg="";
   if(ws.length>=2){
-    const vals=ws.map(r=>r.d.weight), lo=Math.floor(Math.min(...vals,P.target)-1), hi=Math.ceil(Math.max(...vals)+1);
+    const vals=ws.map(r=>r.d.weight), lo=Math.floor(Math.min(...vals,P.target)-1), hi=Math.ceil(Math.max(...vals,P.target)+1);
     const yy=v=>T+ih-(v-lo)/(hi-lo)*ih, xx=k=>L+keys.indexOf(k)*bw+bw/2;
     wsvg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="체중 변화">`;
+    wsvg+=`<polygon fill="var(--protein)" opacity=".12" points="${xx(ws[0].k)},${T+ih} ${ws.map(r=>xx(r.k)+","+yy(r.d.weight)).join(" ")} ${xx(ws[ws.length-1].k)},${T+ih}"/>`;
+    [ws[0],ws[ws.length-1]].forEach((r,i)=>{const d=fromKey(r.k);wsvg+=`<text class="ax" x="${xx(r.k)}" y="${H-6}" text-anchor="${i?"end":"start"}">${d.getMonth()+1}/${d.getDate()}</text>`});
     [lo,(lo+hi)/2,hi].forEach(v=>{wsvg+=`<line x1="${L}" x2="${W-6}" y1="${yy(v)}" y2="${yy(v)}" stroke="var(--line)"/><text class="ax" x="${L-6}" y="${yy(v)+3}" text-anchor="end">${f1(v)}</text>`});
     if(P.target>=lo) wsvg+=`<line x1="${L}" x2="${W-6}" y1="${yy(P.target)}" y2="${yy(P.target)}" stroke="var(--ink)" stroke-dasharray="4 3"/><text class="ax" x="${W-8}" y="${yy(P.target)-4}" text-anchor="end" style="fill:var(--ink)">목표 ${f1(P.target)}</text>`;
     wsvg+=`<polyline fill="none" stroke="var(--protein)" stroke-width="2" stroke-linejoin="round" points="${ws.map(r=>xx(r.k)+","+yy(r.d.weight)).join(" ")}"/>`;
-    ws.forEach((r,i)=>{const last=i===ws.length-1;wsvg+=`<circle cx="${xx(r.k)}" cy="${yy(r.d.weight)}" r="${last?4.5:3}" fill="${last?"var(--protein)":"var(--surface)"}" stroke="var(--protein)" stroke-width="2"><title>${label(r.k)} ${f1(r.d.weight)}kg</title></circle>`});
+    ws.forEach((r,i)=>{const last=i===ws.length-1;wsvg+=`<circle cx="${xx(r.k)}" cy="${yy(r.d.weight)}" r="${last?4.5:n>30?2:3}" fill="${last?"var(--protein)":"var(--surface)"}" stroke="var(--protein)" stroke-width="2"><title>${label(r.k)} ${f1(r.d.weight)}kg</title></circle>`});
     const lr=ws[ws.length-1]; wsvg+=`<text class="ax" x="${Math.min(xx(lr.k),W-24)}" y="${yy(lr.d.weight)-9}" text-anchor="middle" style="fill:var(--ink);font-weight:600">${f1(lr.d.weight)}</text></svg>`;
   }
   const body=$("#statsBody"); if(!body) return;
@@ -564,7 +572,7 @@ async function fillStats(){
     <section class="sec"><div class="sec-h"><h2>탄단지 비율</h2><span class="aside">목표 ${SPLITS[P.split][0]}:${SPLITS[P.split][1]}:${SPLITS[P.split][2]}</span></div>
       <div class="card">${logged.length?`<div class="split"><span style="width:${sum.c/tot*100}%;background:var(--carb)"></span><span style="width:${sum.p/tot*100}%;background:var(--protein)"></span><span style="width:${sum.f/tot*100}%;background:var(--fat)"></span></div>
       <div class="legend"><span><i style="background:var(--carb)"></i>탄수화물 ${Math.round(sum.c/tot*100)}%</span><span><i style="background:var(--protein)"></i>단백질 ${Math.round(sum.p/tot*100)}%</span><span><i style="background:var(--fat)"></i>지방 ${Math.round(sum.f/tot*100)}%</span></div>`:`<div class="empty" style="padding:6px">음식을 기록하면 비율이 보여요</div>`}</div></section>
-    <section class="sec"><div class="sec-h"><h2>체중</h2><span class="aside">${ws.length}회 기록</span></div><div class="chart">${wsvg||`<div class="empty">체중을 두 번 이상 기록하면 그래프가 그려져요</div>`}</div></section>`;
+    <section class="sec"><div class="sec-h"><h2>체중</h2><span class="aside">${ws.length}회 기록</span></div><div class="chart">${ws.length?(()=>{const cur=ws[ws.length-1].d.weight,gap=cur-P.target;return `<div class="wsum"><span>시작<b class="num">${f1(ws[0].d.weight)}</b></span><span>지금<b class="num">${f1(cur)}</b></span><span>목표까지<b class="num">${gap>0?f1(gap)+"kg":"달성"}</b></span></div>`})():""}${wsvg||`<div class="empty">체중을 두 번 이상 기록하면 그래프가 그려져요</div>`}</div></section>`;
 }
 
 /* ---------- 목표 ---------- */
@@ -827,7 +835,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="wIn")
 async function loadAll(){
   P={...defaultProfile(),...(await Store.get("profile")||{})};
   if(P.lunch.on&&!P.lunch.from){P.lunch={...P.lunch,from:today()}; saveP()}
-  await Promise.all([...Array.from({length:14},(_,i)=>addDays(S.date,-i)),...weekKeys(S.date)].filter(k=>k<=today()).map(loadDay));
+  await Promise.all([...Array.from({length:30},(_,i)=>addDays(S.date,-i)),...weekKeys(S.date)].filter(k=>k<=today()).map(loadDay));
 }
 async function boot(){
   await loadAll(); render();
